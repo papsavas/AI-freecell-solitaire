@@ -18,9 +18,13 @@ import sys
 
 NUM_OF_STACKS=8
 
-#scan inputs 
-inputs = pd.read_csv(r"C:\Users\papsa\Desktop\Εργασία Τεχνητής Νοημοσύνης\generator tests\solitaire5.txt", sep=" ", header=None)
-#inputs.rows = ["St1", "St2", "St3", "St4", "St5", "St6", "St7", "St8"]   
+def returnInputs(argv):
+    inputs = pd.read_csv(r"C:\Users\papsa\Desktop\Εργασία Τεχνητής Νοημοσύνης\generator tests\solitaire5.txt", sep=" ", header=None)
+    #inputs.rows = ["St1", "St2", "St3", "St4", "St5", "St6", "St7", "St8"] 
+    return inputs
+
+
+  
       
 #-------------------------------set the field---------------------------------------------------------------------------------
 spades_and_clubs = ['S', 'C']
@@ -63,29 +67,26 @@ for i in range(4):
     foundations.append(stackF)
     foundations[i].append(Card(returnSuit(i),-1))
 
-
-
-
-outxt = open("outputs.txt", "a")
-outxt.write("Kappa position = "   +"\n")
-
-frontier = deque()
-
 tableau=[]
 for i in range(NUM_OF_STACKS): #input data to the tableau
          stackT=deque()     #instead of stack=[], deque is quicker 
          tableau.append(stackT)
-         for item in inputs.iloc[i]:
+         for item in returnInputs(sys.argv).iloc[i]:
             if(item == item):  #avoid not assigned values
                 tableau[i].append(Card(item[0],item[1:3])) #Slice card to Card arguments
                 print(item, "added in stack no:",i+1)
-  
+
+frontier = deque()                
+                
+outxt = open("outputs.txt", "a")
+outxt.write("Kappa position = "   +"\n")
+ 
     
 class GameInstance(object):  
     def __init__(self, free_cells, tableau, foundations):
-        self.free_cells = copy.deepcopy(free_cells)  #deepcopy provides privacy to changes between instances 
-        self.tableau = copy.deepcopy(tableau)
-        self.foundations= copy.deepcopy(tableau)
+        self.free_cells = free_cells  
+        self.tableau = tableau
+        self.foundations= foundations
         
     def manhattan_distance(self,card,stack): #cd_top is the cards distance from the top of its stack
         cd_top= len(stack)-stack.index(card)
@@ -97,15 +98,16 @@ class GameInstance(object):
     def printCard(self,card): #testing method
         print(card.suit+card.number)
         
-    def copy2freecells(self,node, card):
-         for pos in range(len(node.fc)):
-             if(node.fc[pos].number==-1):
-                 node.fc[pos].number=card.number
-                 node.fc[pos].suit=card.suit
+    def copy2freecells(self, card):
+         for pos in range(len(free_cells)):
+             if(self.free_cells[pos].number==-1):
+                 self.free_cells[pos].number=card.number
+                 self.free_cells[pos].suit=card.suit
                  outxt.write("freecell " +card.suit+card.number +" \n")
                  print("freecell " +card.suit+card.number)
-                 return
-                 #print("freecells are full")
+                 return 
+             else:
+                print("cell "+str(pos+1) +" is not empty")
                  
     
     def moveAll2tableau(self): #check whatever card you can add to tableau from freecells
@@ -123,39 +125,58 @@ class GameInstance(object):
                             
     
     def add2Foundations(self,card):
-        foundations[returnSuit(card.suit)].append(card)
+        self.foundations[returnSuit(card.suit)].append(card)
         outxt.write("foundation " +str(card.suit)+ str(card.number)+"\n")
         print("\n foundation " +str(card.suit)+ str(card.number)+"\n")
     
     
-    def check4Moving2Foundations(self): #check if any last or freecells card can be added to foundations
+    def check4Moving2Foundations(self): #check if any top or freecells card can be added to foundations
         #check from free cells
-        for frcard in free_cells:
+        for frcard in self.free_cells:
             if (int(frcard.number)) > -1: #if there is a card
-                if int(frcard.number) == int(foundations[returnSuit(frcard.suit)][-1].number) +1:
-                   add2Foundations(frcard)
+                if int(frcard.number) == int(self.foundations[returnSuit(frcard.suit)][-1].number) +1:
+                   self.add2Foundations(frcard)
                    frcard.suit=""
                    frcard.number=-1
                             
         for i in range(NUM_OF_STACKS):
-            if(tableau[i]):
-                print("cheking for ",tableau[i][-1].suit+tableau[i][-1].number)
-                suit_index=returnSuit(tableau[i][-1].suit)
-                if foundations[suit_index]:
-                    if int(tableau[i][-1].number) == int(foundations[suit_index][-1].number)+1:
-                        add2Foundations(tableau[i].pop())
+            if(self.tableau[i]):
+                print("cheking for ",self.tableau[i][-1].suit+self.tableau[i][-1].number)
+                suit_index=returnSuit(self.tableau[i][-1].suit)
+                if self.foundations[suit_index]:
+                    if int(self.tableau[i][-1].number) == int(self.foundations[suit_index][-1].number)+1:
+                        self.add2Foundations(self.tableau[i].pop())
                     else:
-                        if(int(tableau[i][-1].number)==0):
-                            add2Foundations(tableau[i].pop())
+                        if(int(self.tableau[i][-1].number)==0):
+                            self.add2Foundations(self.tableau[i].pop())
     
-    def returnTableau(self):
-        return tableau
     
-    def returnFreeCells(self):
-        return free_cells
+    def printGame(self):
+        print('\n')
+        print("Freecells: ",self.free_cells[0].suit+str(self.free_cells[0].number)+\
+        ','+self.free_cells[1].suit+str(self.free_cells[1].number) +\
+        ','+self.free_cells[2].suit+str(self.free_cells[2].number) +\
+        ','+self.free_cells[3].suit+str(self.free_cells[3].number) +',')
+        
+        print('\nTableau:\n')
+        ststr=[]
+        for i in range(NUM_OF_STACKS):
+            stri=''
+            for j in range(len(self.tableau[i])):
+                 stri+=(self.tableau[i][j].suit+str(self.tableau[i][j].number) +' ')
+            ststr.append(stri)
+            print(ststr[i]) 
+        
+        print('\nFoundations:\n')
+        ststr2=[]   
+        for k in range(4):
+            strii=''
+            for l in range(len(self.foundations[k])):
+                 strii+=(self.foundations[k][l].suit+str(self.foundations[k][l].number) +' ')
+            ststr2.append(strii)
+            print(ststr2[k])
+     
     
-    def returnFoundations(self):
-        return foundations
 
 
             
@@ -192,19 +213,24 @@ class TreeNode(GameInstance, NodeMixin):  # Add Node feature
         #this function checks if parent nodes contain equal instances
         parent=node.parent
         while(parent != None):
-            if(equalInstances(node, parent)):
+            if(self.equalInstances(node, parent)):
                 return False
             parent=parent.parent
             return True     
         
 #set starting values to gi        
-g0=GameInstance(copy.deepcopy(free_cells),copy.deepcopy(tableau), copy.deepcopy(foundations))  
 
-def main(argv):
     
-    
-    print("main")
-    """  
+
+g0=GameInstance(free_cells,tableau,foundations)  
+#initialize root
+root=TreeNode("root",0,0,0,None,None,-1)
+
+GI= [] #LIST WITH ALL GAME INSTANCES
+GI.append(g0)
+
+
+def getMethod(argv):
     if(len(argv) != 4):
         print("error in arguments. Use correct syntax")
         
@@ -216,7 +242,41 @@ def main(argv):
     print(argv)
     print("method is:" +method)
     
-"""
+    
+def isSolution(foundation):
+    flag=True
+    for i in range(4):
+        if int(foundation[i][-1].number) != 12:
+            flag=False
+            break
+    return flag
+            
+def returnNewInstance(last_gi):
+    gi=GameInstance(copy.deepcopy(last_gi.free_cells),copy.deepcopy(last_gi.tableau),copy.deepcopy(last_gi.foundations))   #deepcopy to prevent instance privacy
+    GI.append(gi)
+    return GI
+
+def main(argv):
+    print("main")
+    #while(not isSolution(GI[-1])):
+    
+    
+    returnNewInstance(GI[-1])
+    print("new instance created")
+
+    GI[-1].check4Moving2Foundations()    
+    GI[-1].printGame()
+   
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     
         
 if __name__ == "__main__":
