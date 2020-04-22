@@ -4,6 +4,7 @@ Created on Fri Apr  3 19:59:34 2020
 
 @author: SAVVAS PAPAGEORGIADIS - dai18001@uom.edu.gr
 
+Python 3.7
 External Packages: anytree, pandas 
 
 
@@ -76,7 +77,7 @@ for i in range(NUM_OF_STACKS): #input data to the tableau
                 tableau[i].append(Card(item[0],item[1:3])) #Slice card to Card arguments
                 print(item, "added in stack no:",i+1)
 
-frontier = deque()                
+frontier = []             
                 
 outxt = open("outputs.txt", "a")
 outxt.write("Kappa position = "   +"\n")
@@ -90,7 +91,7 @@ class GameInstance(object):
         
     def manhattan_distance(self,card,stack): #cd_top is the cards distance from the top of its stack
         cd_top= len(stack)-stack.index(card)
-        f_top_number=foundations[returnSuit(card.suit)][-1].number
+        f_top_number=self.foundations[returnSuit(card.suit)][-1].number
         dist=int(card.number)-int(f_top_number)
         m_dist=dist+cd_top
         return m_dist    
@@ -138,6 +139,7 @@ class GameInstance(object):
                    self.add2Foundations(frcard)
                    frcard.suit=""
                    frcard.number=-1
+                   return
                             
         for i in range(NUM_OF_STACKS):
             if(self.tableau[i]):
@@ -146,10 +148,31 @@ class GameInstance(object):
                 if self.foundations[suit_index]:
                     if int(self.tableau[i][-1].number) == int(self.foundations[suit_index][-1].number)+1:
                         self.add2Foundations(self.tableau[i].pop())
-                    else:
-                        if(int(self.tableau[i][-1].number)==0):
-                            self.add2Foundations(self.tableau[i].pop())
+                        return
+                else:
+                    if(int(self.tableau[i][-1].number)==0):
+                        self.add2Foundations(self.tableau[i].pop())
+                        return
     
+    def returnCardDistances(self):
+        GBcards=[]
+        for i in range(NUM_OF_STACKS):
+            sdist=[]
+            for card in self.tableau[i]:
+                distNcard=[self.manhattan_distance(card, self.tableau[i]), card]
+                sdist.append(distNcard)
+            GBcards.append(sdist)
+        return GBcards
+            
+    def BestCard(self):
+        C_D=self.returnCardDistances()
+        min_card=C_D[0][0][0],C_D[0][0][1] #manhattan_distance of the first card
+        for i in range(NUM_OF_STACKS):
+            for j in range(len(C_D[i])):
+                if(C_D[i][j][0] < min_card[0]):
+                    min_card=C_D[i][j]
+                
+        return min_card
     
     def printGame(self):
         print('\n')
@@ -185,7 +208,6 @@ class GameInstance(object):
      
 class TreeNode(GameInstance, Node):  # Add Node feature
     def __init__(self, gi,name, h, g, f, parent, children, direction):
-        #super(TreeNode,self).__init__(free_cells,tableau,foundations)
         self.gi=gi
         self.name = name
         self.h = h
@@ -197,24 +219,24 @@ class TreeNode(GameInstance, Node):  # Add Node feature
             self.children = children 
         self.direction=direction    
         
-    def equalInstances(self,node1, node2):
+    def equalInstances(self, node2):
         equal=True
         for stN in range(NUM_OF_STACKS): #check tableaus
-            for j in range(-1,-len(node1.t[stN])):
-                if(node1.t[stN][j].number != node2.t[stN][j].number) and (node1.t[stN][j].suit != node2.t[stN][j].suit):
+            for j in range(-1,-len(self.gi.tableau[stN])):
+                if(self.gi.tableau[stN][j].number != node2.gi.tableau[stN][j].number) and (self.gi.tableau[stN][j].suit != node2.gi.tableau[stN][j].suit):
                     equal=False
                     print("stN, j = " ,stN,j)
                     return equal
         for i in range(4):
-            if (node1.fc[i].suit != node2.fc[i].suit) and (node1.fc[i].number != node2.fc[i].number):
+            if (self.gi.free_cells[i].suit != node2.gi.free_cells[i].suit) and (self.gi.free_cells[i].number != node2.gi.free_cells[i].number):
                 equal=False
         return equal   
     
-    def ok_with_parents(self,node):
+    def loop_in_parents(self):
         #this function checks if parent nodes contain equal instances
-        parent=node.parent
+        parent=self.parent
         while(parent != None):
-            if(self.equalInstances(node, parent)):
+            if(self.equalInstances(parent)):
                 return False
             parent=parent.parent
             return True     
@@ -262,6 +284,31 @@ def add2tree(gi, parent):
     return node
 
 
+def add_frontier_top(node):
+    if(node.is_leaf()):
+        frontier.insert(0,node)
+        return True
+    else:
+        print(str(node.name())+" is not a leaf")
+        return False
+
+def add_frontier_back(node):
+    if(node.is_leaf()):
+        frontier.append(node)
+        return True
+    else:
+        print(str(node.name())+" is not a leaf")
+        return False
+    
+def add_frontier_in_order(node):
+    if(node.is_leaf()):
+        frontier.append(node)
+        frontier.sort(key=(node.f,node.h))
+        return True
+    else:
+        print(str(node.name())+" is not a leaf")
+        return False
+    
 
 def main(argv):
     print("main")
@@ -277,15 +324,11 @@ def main(argv):
     #add to tree the new node and prepare for the next one
     new_node=add2tree(GI[-1], last_node) 
     last_node=new_node
+
     
-    
-    
-    
-    
-    
-    
-    
-    
+  #  c11=root.children[0].children[0]
+   # bc1=c11.gi.BestCard()
+
         
 if __name__ == "__main__":
    main(sys.argv)
