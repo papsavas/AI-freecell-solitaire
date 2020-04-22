@@ -12,7 +12,7 @@ External Packages: anytree, pandas
 from collections import deque 
 import pandas as pd
 import copy
-from anytree import NodeMixin, RenderTree
+from anytree import Node, RenderTree
 import sys 
 
 
@@ -183,9 +183,10 @@ class GameInstance(object):
         
              
      
-class TreeNode(GameInstance, NodeMixin):  # Add Node feature
-    def __init__(self, name, h, g, f, parent, children, direction):
-        super(TreeNode,self).__init__(free_cells,tableau,foundations)
+class TreeNode(GameInstance, Node):  # Add Node feature
+    def __init__(self, gi,name, h, g, f, parent, children, direction):
+        #super(TreeNode,self).__init__(free_cells,tableau,foundations)
+        self.gi=gi
         self.name = name
         self.h = h
         self.g = g
@@ -224,7 +225,7 @@ class TreeNode(GameInstance, NodeMixin):  # Add Node feature
 
 g0=GameInstance(free_cells,tableau,foundations)  
 #initialize root
-root=TreeNode("root",0,0,0,None,None,-1)
+root=TreeNode(g0,"root",0,0,0,None,None,-1)
 
 GI= [] #LIST WITH ALL GAME INSTANCES
 GI.append(g0)
@@ -256,19 +257,26 @@ def returnNewInstance(last_gi):
     GI.append(gi)
     return GI
 
+def add2tree(gi, parent):
+    node=TreeNode(gi,"Node"+str(len(GI)-1), 0,0,0, parent, None,None)
+    return node
+
+
+
 def main(argv):
     print("main")
-    #while(not isSolution(GI[-1])):
-    
-    
     returnNewInstance(GI[-1])
     print("new instance created")
-
-    GI[-1].check4Moving2Foundations()    
+    last_node=add2tree(GI[-1], root)  #initiate first child of root
+    #while(not isSolution(GI[-1].foundations)):
+    returnNewInstance(GI[-1])
+    print("new instance created")
+    
+    GI[-1].check4Moving2Foundations()      #move example
     GI[-1].printGame()
-   
-    
-    
+    #add to tree the new node and prepare for the next one
+    new_node=add2tree(GI[-1], last_node) 
+    last_node=new_node
     
     
     
