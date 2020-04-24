@@ -97,7 +97,7 @@ class GameInstance(object):
         return m_dist    
     
     def printCard(self,card): #testing method
-        print(card.suit+card.number)
+        return(card.suit+str(card.number))
         
     def copy2freecells(self, card):
          for pos in range(len(free_cells)):
@@ -106,24 +106,47 @@ class GameInstance(object):
                  self.free_cells[pos].suit=card.suit
                  outxt.write("freecell " +card.suit+card.number +" \n")
                  print("freecell " +card.suit+card.number)
-                 return 
+                 return True
              else:
                 print("cell "+str(pos+1) +" is not empty")
-                 
+         return False
+        
     
-    def moveAll2tableau(self): #check whatever card you can add to tableau from freecells
-            for FrCard in free_cells:
+    def freecells2tableau(self): #check whatever card you can add to tableau from freecells
+            for FrCard in self.free_cells:
                 for TStNum in range(NUM_OF_STACKS):
-                    tabltop = tableau[TStNum][-1]
-                    if (tabltop.suit in spades_and_clubs and FrCard.suit in diamonds_and_hearts) or (tabltop.suit in diamonds_and_hearts and FrCard.suit in spades_and_clubs):
-                        if(FrCard.number == int(tabltop.number) - 1):
-                            FrCard_copy = copy.deepcopy(FrCard)  #Requires deep copy to maintain the value of the variable in the stack when changing it to the free_cells list
-                            tableau[TStNum].append(FrCard_copy)
-                            outxt.write("stack "+str(FrCard.suit)+str(FrCard.number) +" "+ str(tabltop.suit)+str(tabltop.number)+"\n")
-                            print("\nstack",str(FrCard.suit)+str(FrCard.number), str(tabltop.suit)+str(tabltop.number)+"\n")
-                            FrCard.suit=""
-                            FrCard.number=-1
-                            
+                    if(self.tableau[TStNum]):
+                        tabltop = self.tableau[TStNum][-1]
+                        if (tabltop.suit in spades_and_clubs and FrCard.suit in diamonds_and_hearts) or \
+                            (tabltop.suit in diamonds_and_hearts and FrCard.suit in spades_and_clubs):
+                            if(FrCard.number == int(tabltop.number) - 1):
+                                self.tableau[TStNum].append(FrCard)
+                                outxt.write("stack "+str(FrCard.suit)+str(FrCard.number) +" "+ str(tabltop.suit)+str(tabltop.number)+"\n")
+                                print("\nstack",str(FrCard.suit)+str(FrCard.number), str(tabltop.suit)+str(tabltop.number)+"\n")
+                                FrCard.suit=""
+                                FrCard.number=-1
+                                return True
+                    
+            return False
+                        
+    def stackCard(self,card):
+        for i in range(NUM_OF_STACKS):
+            if(self.tableau[i]):
+                if(card in self.tableau[i]): #skip cards stack
+                    continue
+                else:
+                    currTop=self.tableau[i][-1] #stacks current top card
+                    if (currTop.suit in spades_and_clubs and card.suit in diamonds_and_hearts) or \
+                        (currTop.suit in diamonds_and_hearts and card.suit in spades_and_clubs):
+                            if(int(card.number) == int(currTop.number) - 1):
+                                self.tableau[i].append(card)
+                                outxt.write("stack "+str(card.suit)+str(card.number) +" "+str(currTop.suit)+str(currTop.number)+'\n')
+                                print("stack "+str(card.suit)+str(card.number) +" "+str(currTop.suit)+str(currTop.number)+'\n')
+                                return True
+        return False                    
+                    
+                
+                    
     
     def add2Foundations(self,card):
         self.foundations[returnSuit(card.suit)].append(card)
@@ -139,20 +162,22 @@ class GameInstance(object):
                    self.add2Foundations(frcard)
                    frcard.suit=""
                    frcard.number=-1
-                   return
+                   return True
                             
         for i in range(NUM_OF_STACKS):
             if(self.tableau[i]):
-                print("cheking for ",self.tableau[i][-1].suit+self.tableau[i][-1].number)
+                #print("cheking for ",self.tableau[i][-1].suit+self.tableau[i][-1].number)
                 suit_index=returnSuit(self.tableau[i][-1].suit)
                 if self.foundations[suit_index]:
                     if int(self.tableau[i][-1].number) == int(self.foundations[suit_index][-1].number)+1:
                         self.add2Foundations(self.tableau[i].pop())
-                        return
+                        return True
                 else:
                     if(int(self.tableau[i][-1].number)==0):
                         self.add2Foundations(self.tableau[i].pop())
-                        return
+                        return True
+        return False
+    
     
     def returnCardDistances(self):
         GBcards=[]
@@ -222,14 +247,16 @@ class TreeNode(GameInstance, Node):  # Add Node feature
     def equalInstances(self, node2):
         equal=True
         for stN in range(NUM_OF_STACKS): #check tableaus
-            for j in range(-1,-len(self.gi.tableau[stN])):
-                if(self.gi.tableau[stN][j].number != node2.gi.tableau[stN][j].number) and (self.gi.tableau[stN][j].suit != node2.gi.tableau[stN][j].suit):
-                    equal=False
-                    print("stN, j = " ,stN,j)
-                    return equal
+            for j in range(1,len(self.gi.tableau[stN])):
+                if self.gi.tableau[stN] and node2.gi.tableau[stN]:
+                    if(self.gi.tableau[stN][-j].number != node2.gi.tableau[stN][-j].number) and (self.gi.tableau[stN][-j].suit != node2.gi.tableau[stN][-j].suit):
+                        equal=False
+                        return equal
+                    
         for i in range(4):
             if (self.gi.free_cells[i].suit != node2.gi.free_cells[i].suit) and (self.gi.free_cells[i].number != node2.gi.free_cells[i].number):
                 equal=False
+                return equal
         return equal   
     
     def loop_in_parents(self):
@@ -237,21 +264,11 @@ class TreeNode(GameInstance, Node):  # Add Node feature
         parent=self.parent
         while(parent != None):
             if(self.equalInstances(parent)):
-                return False
+                return True
             parent=parent.parent
-            return True     
+        return False     
         
-#set starting values to gi        
-
     
-
-g0=GameInstance(free_cells,tableau,foundations)  
-#initialize root
-root=TreeNode(g0,"root",0,0,0,None,None,-1)
-
-GI= [] #LIST WITH ALL GAME INSTANCES
-GI.append(g0)
-
 
 def getMethod(argv):
     if(len(argv) != 4):
@@ -266,10 +283,10 @@ def getMethod(argv):
     print("method is:" +method)
     
     
-def isSolution(foundation):
+def isSolution(foundations):
     flag=True
     for i in range(4):
-        if int(foundation[i][-1].number) != 12:
+        if int(foundations[i][-1].number) != 12:
             flag=False
             break
     return flag
@@ -308,10 +325,103 @@ def add_frontier_in_order(node):
     else:
         print(str(node.name())+" is not a leaf")
         return False
+
+"""    
+def loopHandling(last_node,new_node):
+    if(new_node.loop_in_parents()):
+        print("loop detected")
+        new_node.parent=None
+        del new_node                
+    else:
+        last_node=new_node
+"""
+
+def DFS(root):
+    returnNewInstance(GI[-1])
+    last_node=add2tree(GI[-1], root)
+    stack_number=0
+    dead_end = False
+
+    while (not(isSolution(last_node.gi.foundations))) and (not dead_end) and stack_number<8:
+        if(not last_node.gi.tableau[stack_number]):
+            stack_number+=1
+        print('\nstack no:',stack_number)
+        returnNewInstance(GI[-1])
+        print("selected card is: "+last_node.gi.printCard(tableau[stack_number][-1]))
+        if(last_node.gi.check4Moving2Foundations()):
+            new_node=add2tree(GI[-1], last_node)
+            if(new_node.loop_in_parents()):
+                print("loop detected")
+                new_node.parent=None
+                del new_node                
+            else:
+                last_node=new_node
+            print("dfs foundations")
+            continue
+        
+        elif(last_node.gi.freecells2tableau()):
+            new_node=add2tree(GI[-1], last_node) 
+            if(new_node.loop_in_parents()):
+                print("loop detected")
+                new_node.parent=None
+                del new_node                
+            else:
+                last_node=new_node
+            print("dfs freecells2tableau")
+            continue
+        
+        elif(last_node.gi.stackCard(last_node.gi.tableau[stack_number][-1])):
+            last_node.gi.tableau[stack_number].pop() #get rid of the clone card 
+            new_node=add2tree(GI[-1], last_node) 
+            if(new_node.loop_in_parents()):
+                print("loop detected")
+                new_node.parent=None
+                del new_node                
+            else:
+                last_node=new_node
+            print("dfs stack2stack")
+            continue
+        
+        elif(last_node.gi.copy2freecells(last_node.gi.tableau[stack_number][-1])):
+            last_node.gi.tableau[stack_number].pop()
+            new_node=add2tree(GI[-1], last_node) 
+            if(new_node.loop_in_parents()):
+                print("loop detected")
+                new_node.parent=None
+                del new_node                
+            else:
+                last_node=new_node
+            print("dfs 2freecells")
+            continue
+        
+        else:
+            print('dead end')
+            dead_end=True
+            break
+            
     
+    return last_node
+                    
+                
+        
+    
+            
+            
+    
+    
+
+g0=GameInstance(free_cells,tableau,foundations)  
+#initialize root
+root=TreeNode(g0,"root",0,0,0,None,None,-1)
+
+GI= [] #LIST WITH ALL GAME INSTANCES
+GI.append(g0)
+
 
 def main(argv):
     print("main")
+    dfs=DFS(root)
+    """
     returnNewInstance(GI[-1])
     print("new instance created")
     last_node=add2tree(GI[-1], root)  #initiate first child of root
@@ -322,14 +432,15 @@ def main(argv):
     GI[-1].check4Moving2Foundations()      #move example
     GI[-1].printGame()
     #add to tree the new node and prepare for the next one
-    new_node=add2tree(GI[-1], last_node) 
-    last_node=new_node
+   """
 
     
   #  c11=root.children[0].children[0]
    # bc1=c11.gi.BestCard()
 
-        
+     
+    
+    
 if __name__ == "__main__":
    main(sys.argv)
 
