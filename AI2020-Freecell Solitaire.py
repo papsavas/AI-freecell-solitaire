@@ -20,7 +20,7 @@ import sys
 NUM_OF_STACKS=8
 
 def returnInputs(argv):
-    inputs = pd.read_csv(r"C:\Users\papsa\Desktop\Εργασία Τεχνητής Νοημοσύνης\generator tests\solitaire5.txt", sep=" ", header=None)
+    inputs = pd.read_csv(r"C:\Users\papsa\Desktop\Εργασία Τεχνητής Νοημοσύνης\generator tests\solitaire7.txt", sep=" ", header=None)
     #inputs.rows = ["St1", "St2", "St3", "St4", "St5", "St6", "St7", "St8"] 
     return inputs
 
@@ -100,8 +100,8 @@ class GameInstance(object):
         return(card.suit+str(card.number))
         
     def copy2freecells(self, card):
-         for pos in range(len(free_cells)):
-             if(self.free_cells[pos].number==-1):
+         for pos in range(4):
+             if(int(self.free_cells[pos].number)==-1):
                  self.free_cells[pos].number=card.number
                  self.free_cells[pos].suit=card.suit
                  outxt.write("freecell " +card.suit+card.number +" \n")
@@ -139,20 +139,26 @@ class GameInstance(object):
                         
             return False
                         
-    def stackCard(self,card):
+    def stackCard(self,CardsStack):
+        if len(CardsStack)>1 and (CardsStack[-1].suit in spades_and_clubs and CardsStack[-2].suit in diamonds_and_hearts) or \
+                            (CardsStack[-1].suit in diamonds_and_hearts and CardsStack[-2].suit in spades_and_clubs):
+                                if(int(CardsStack[-1].number) == int(CardsStack[-2].number) - 1):
+                                    return False
         for i in range(NUM_OF_STACKS):
             if(self.tableau[i]):
-                if(card in self.tableau[i]): #skip cards stack
+                if(CardsStack[-1] in self.tableau[i]): #skip cards stack
                     continue
                 else:
-                    currTop=self.tableau[i][-1] #stacks current top card
-                    if (currTop.suit in spades_and_clubs and card.suit in diamonds_and_hearts) or \
-                        (currTop.suit in diamonds_and_hearts and card.suit in spades_and_clubs):
-                            if(int(card.number) == int(currTop.number) - 1):
-                                self.tableau[i].append(card)
-                                outxt.write("stack "+str(card.suit)+str(card.number) +" "+str(currTop.suit)+str(currTop.number)+'\n')
-                                print("stack "+str(card.suit)+str(card.number) +" "+str(currTop.suit)+str(currTop.number)+'\n')
-                                return True
+                    if len(CardsStack) < len(self.tableau[i]):
+                        currTop=self.tableau[i][-1] #stacks current top card
+                        if (currTop.suit in spades_and_clubs and CardsStack[-1].suit in diamonds_and_hearts) or \
+                            (currTop.suit in diamonds_and_hearts and CardsStack[-1].suit in spades_and_clubs):
+                                if(int(CardsStack[-1].number) == int(currTop.number) - 1):
+                                    self.tableau[i].append(CardsStack[-1])
+                                    outxt.write("stack "+str(CardsStack[-1].suit)+str(CardsStack[-1].number) +" "+str(currTop.suit)+str(currTop.number)+'\n')
+                                    print("stack "+str(CardsStack[-1].suit)+str(CardsStack[-1].number) +" "+str(currTop.suit)+str(currTop.number)+'\n')
+                                    print(self.printGame())
+                                    return True
         return False                    
                     
                 
@@ -197,7 +203,7 @@ class GameInstance(object):
             GBcards.append(sdist)
         return GBcards
             
-    def BestCard(self):
+    def BestCard(self): #search and find the best card in current situations
         C_D=self.returnCardDistances()
         min_card=C_D[0][0][0],C_D[0][0][1] #manhattan_distance of the first card
         for i in range(NUM_OF_STACKS):
@@ -256,6 +262,8 @@ class TreeNode(GameInstance, Node):  # Add Node feature
         equal=True
         for stN in range(NUM_OF_STACKS): #check tableaus
             for j in range(1,len(self.gi.tableau[stN])):
+                if (not self.gi.tableau[stN][-j]) ^ (not node2.gi.tableau[stN][-j]): #if some node stack is out of range means that somethings different
+                    return False
                 if self.gi.tableau[stN] and node2.gi.tableau[stN]:
                     if(self.gi.tableau[stN][-j].number != node2.gi.tableau[stN][-j].number) and \
                     (self.gi.tableau[stN][-j].suit != node2.gi.tableau[stN][-j].suit):
@@ -270,11 +278,11 @@ class TreeNode(GameInstance, Node):  # Add Node feature
     
     def loop_in_parents(self):
         #this function checks if parent nodes contain equal instances
-        parent=self.parent
-        while(parent != None):
-            if(self.equalInstances(parent)):
+        parent1=self.parent
+        while(parent1!= None):
+            if(self.equalInstances(parent1)):
                 return True
-            parent=parent.parent
+            parent1=parent1.parent
         return False     
         
     
@@ -305,8 +313,8 @@ def returnNewInstance(last_gi):
     GI.append(gi)
     return GI
 
-def add2tree(parent):
-    node=TreeNode(copy.deepcopy(parent.gi),"child of "+str(parent.depth), 0,0,0, parent, None,None)
+def add2tree(parent, gi):
+    node=TreeNode(copy.deepcopy(gi),"Node"+str(parent.depth), 0,0,0, parent, None,None)
     return node
 
 
@@ -335,91 +343,156 @@ def add_frontier_in_order(node):
         print(str(node.name())+" is not a leaf")
         return False
 
-   
-def loopHandling(parent_node,current_node):
+""" 
+def loopHandling(parent_node,current_node,rejected_flag):
     if(current_node.loop_in_parents()):
         print("loop detected")
-        current_node.parent=None
-        return parent_node        
+        del current_node
+        rejected_flag=True
+        return parent_node,rejected_flag        
     else:
-        return current_node
+        rejected_flag=False
+        return current_node,rejected_flag
+"""
 
 
-def DFS(root):
+visited=[]
+def recursDFS(sub_root):
     #returnNewInstance(GI[-1])
-    init_stack_number=0
-    while init_stack_number<1:
-        stack_number=0
-        dead_end = False
-        parent=root
-        prev_nodes=[]
-        prev_nodes.append(parent)
-        cycle_counter=0
-        while (not(isSolution(parent.gi.foundations))) and (not dead_end):
-            print('\nstack no:',(stack_number%7)+1)   
-            new_node=add2tree(parent)
-            temp_node=copy.deepcopy(new_node)
-            currCard=temp_node.gi.tableau[stack_number%7][-1]
-            print("card is: " +temp_node.gi.printCard(currCard))
-            foundationsMove = temp_node.gi.add2Foundations(temp_node.gi.tableau[stack_number%7][-1])
-            temp_node.gi.printGame()
-            if(foundationsMove):
-                temp_node.gi.tableau[stack_number%7].pop() #get rid of clone card
-                parent=temp_node
-                print("dfs foundations")
-                cycle_counter=0
-                continue
-            else:
-                temp_node=copy.deepcopy(new_node)
-                freecells2TableauMove = temp_node.gi.freecells2tableau(stack_number%7)
-                if(freecells2TableauMove):
-                    parent=temp_node
-                    print("dfs freecells2tableau!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!ΠΞΣΞΔΑΠΣΞΑΣΠ")
-                    cycle_counter=0
+    if(not sub_root):
+        print("ROOT reached, returning")
+        return sub_root
+   
+    parent=sub_root
+    
+    if(parent in visited):
+        if(parent.parent):
+            recursDFS(parent.parent)
+   
+    
+    dead_end=True
+    foundrejected=False
+    f2trejected=False
+    s2srejected = False
+    freecellrejected = False
+
+    for index in range(NUM_OF_STACKS):
+        print('\nstack no:',(index)+1)   
+        
+        temp_node=copy.deepcopy(parent)
+        currCard=temp_node.gi.tableau[index][-1]
+        print("card is: " +temp_node.gi.printCard(currCard))
+        
+        foundationsMove = temp_node.gi.add2Foundations(temp_node.gi.tableau[index][-1]) #attempt to add current card to Foundations
+        if(foundationsMove):
+            temp_node.gi.tableau[index].pop() #get rid of clone card
+            temparent=parent
+            while(temparent!=None):
+                if(not temp_node.equalInstances(temparent)):
+                    temparent=temparent.parent
                     continue
                 else:
-                    temp_node=copy.deepcopy(new_node)
-                    StackingMove = temp_node.gi.stackCard(temp_node.gi.tableau[stack_number%7][-1])
-                    if(StackingMove):
-                        temp_node.gi.tableau[stack_number%7].pop()
-                        parent=loopHandling(parent,temp_node)
-                        print("dfs stack2stack")
-                        cycle_counter=0
-                        continue
-                    
-                    elif not (int(temp_node.gi.tableau[stack_number%7][-1].number) == int(temp_node.gi.tableau[stack_number%7][-2].number) -1 and\
-                       (temp_node.gi.tableau[stack_number%7][-1].suit in diamonds_and_hearts and temp_node.gi.tableau[stack_number%7][-2].suit in spades_and_clubs) \
-                       or temp_node.gi.tableau[stack_number%7][-1].suit in spades_and_clubs and temp_node.gi.tableau[stack_number%7][-2].suit in diamonds_and_hearts):
-                        temp_node=copy.deepcopy(new_node)
-                        freecellsMove = temp_node.gi.copy2freecells(temp_node.gi.tableau[stack_number%7][-1])
-                        if(freecellsMove):
-                            temp_node.gi.tableau[stack_number%7].pop() #get rid of clone card
-                            parent=loopHandling(parent,temp_node)
-                            print("dfs 2freecells")
-                            cycle_counter=0
-                            continue
-                    else:
-                        cycle_counter+=1
-                        if(cycle_counter>8):
-                            break
-                        parent=temp_node #no action were taken, so return new_node which is clean
-                        stack_number+=1
-                        continue
-                    
+                    print("loop detected")
+                    foundrejected=True
+                    break
+            if(not foundrejected):
+                new_node=add2tree(parent,temp_node.gi)
+                print("dfs foundations")
+                
         
-        add_frontier_front(parent)
-        parent.gi.printGame()
+        temp_node=copy.deepcopy(parent) #clean temp_node from previous changes
+        freecells2TableauMove = temp_node.gi.freecells2tableau(index)
         
-                                
-        if(isSolution(parent.gi.foundations)):
-            print("----------SOLVED----------")
-            parent.gi.printGame()
-            return
-        init_stack_number+=1
-    #return last_node
-                    
-                    
+        if(freecells2TableauMove and not f2trejected):
+            temparent=parent
+            while(temparent!=None):
+                if(not temp_node.equalInstances(temparent)):
+                    temparent=temparent.parent
+                    continue
+                else:
+                    print("loop detected")
+                    f2trejected=True
+                    break
+            if(not f2trejected):
+                new_node=add2tree(parent,temp_node.gi)
+                print("dfs foundations")
+                
+       
+        temp_node=copy.deepcopy(parent)
+        StackingMove = temp_node.gi.stackCard(temp_node.gi.tableau[index])
+        
+        if(StackingMove):
+            temp_node.gi.tableau[index].pop()
+           
+            temparent=parent
+            while(temparent!=None):
+                if(not temp_node.equalInstances(temparent)):
+                    temparent=temparent.parent
+                    continue
+                else:
+                    print("loop detected")
+                    s2srejected=True
+                    break
+            if(not s2srejected):
+                new_node=add2tree(parent,temp_node.gi)
+                print("dfs foundations")
+                
             
+        temp_node=copy.deepcopy(parent)
+        #check if the top 2 cards are already stacked 
+        if len(temp_node.gi.tableau[index])>1 and not ((int(currCard.number) == int(temp_node.gi.tableau[index][-2].number) -1) and ((currCard.suit in diamonds_and_hearts and temp_node.gi.tableau[index][-2].suit in spades_and_clubs) or (currCard.suit in spades_and_clubs and temp_node.gi.tableau[index][-2].suit in diamonds_and_hearts))):
+            freecellsMove = temp_node.gi.copy2freecells(temp_node.gi.tableau[index][-1])
+            if(freecellsMove):
+                temp_node.gi.tableau[index].pop() #get rid of clone card
+                
+                temparent=parent
+                while(temparent!=None):
+                    if(not temp_node.equalInstances(temparent)):
+                        temparent=temparent.parent
+                        continue
+                    else:
+                        print("loop detected")
+                        freecellrejected=True
+                        break
+                if(not freecellrejected):
+                    new_node=add2tree(parent,temp_node.gi)
+                    print("dfs foundations")
+        temp_node.gi.printGame()               
+                
+    if(parent not in visited):
+        visited.append(parent)  #node examined
+   
+    if(isSolution(parent.gi.foundations)):
+        print("----------SOLVED----------")
+        parent.gi.printGame()
+        add_frontier_front(parent)
+        return parent
+        
+    #parent.gi.printGame()
+    
+    if(parent.children): #if parent has children
+        for child in parent.children:
+            if child not in visited:
+                recursDFS(child)
+    else:
+        add_frontier_front(parent)
+        recursDFS(parent.parent)
+    
+            
+
+    
+                            
+    
+#return parent
+                    
+    
+def BEST(root):
+    parent=add2tree(root)
+    
+    init_stack=0
+    while(not(isSolution(parent.gi.foundations))):
+        bestCard=BestCard(parent)
+        
     
     
 
@@ -433,7 +506,8 @@ GI.append(g0)
 
 def main(argv):
     print("main")
-    dfs=DFS(root)
+    dfs=recursDFS(root)
+    #best=BEST(root)
     """
     returnNewInstance(GI[-1])
     print("new instance created")
