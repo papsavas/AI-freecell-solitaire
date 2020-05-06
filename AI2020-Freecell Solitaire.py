@@ -20,7 +20,7 @@ from anytree import Node, RenderTree
 import sys 
 import datetime
 
-run_as_script=True
+run_as_script=False
 NUM_OF_STACKS=8
 
 if(run_as_script):
@@ -95,7 +95,7 @@ for i in range(NUM_OF_STACKS): #input data to the tableau
                 tableau[i].append(Card(item[0],item[1:3])) #Slice card to Card arguments
                 #print(item, "added in stack no:",i+1)
 
-frontier = []
+frontier = deque()
                 
 
 
@@ -339,8 +339,8 @@ def getMethod(ARGV):
     print("method is:" +method)
     
     
-def isSolution(self):
-    for foundation in self.gi.foundations:
+def isSolution(incoming_node):
+    for foundation in incoming_node.gi.foundations:
         if int(foundation[-1].number) != 12:
             return False
     return True
@@ -354,7 +354,7 @@ def add2tree(parent, gi):
 
 def add_frontier_front(node):
     if(node.is_leaf):
-        frontier.insert(0,node)
+        frontier.appendleft(node)
         return True
     else:
         print(str(node.name+" is not a leaf"))
@@ -376,12 +376,13 @@ def add_frontier_in_order(node):
                     continue
                 else:
                     frontier.insert(index,node)
+                    
         else:
-            frontier.insert(0,node)
+            frontier.appendleft(node)
             return True
     
     else:      
-        print(str(node.name())+" is not a leaf")
+        print(str(node.name)+" is not a leaf")
         return False
 
 
@@ -390,10 +391,11 @@ def returnTopCardIndex(node):
     Tindex=0
     Findex=0
     for ind in range(NUM_OF_STACKS):
-        if(node.gi.manhattan_distance(node.gi.tableau[ind][-1],node.gi.tableau[ind]) < mintop):
-            mintop=node.gi.manhattan_distance(node.gi.tableau[ind][-1],node.gi.tableau[ind])
-            Tindex=ind
-            
+        if(node.gi.tableau[ind]):
+            if(node.gi.manhattan_distance(node.gi.tableau[ind][-1],node.gi.tableau[ind]) < mintop):
+                mintop=node.gi.manhattan_distance(node.gi.tableau[ind][-1],node.gi.tableau[ind])
+                Tindex=ind
+                
         
     for ind2 in range(4):
         mintop2=0
@@ -419,20 +421,20 @@ def find_children(sub_root,method):
     loops=0
     
     #index0 index for tableau, index1 for freecells
-    while loops < NUM_OF_STACKS:
+    while loops < NUM_OF_STACKS+1:
         index0=_index0 % NUM_OF_STACKS
-        index1= _index1 % NUM_OF_STACKS
+        index1= _index1 % 4
         print('\nstack no:',(index0)+1)
-        print('\nfreecell no:',(index1)+1)
+        #print('\nfreecell no:',(index1)+1)
         
-        temp_node=copy.deepcopy(parent)
-        temp_node.gi.printGame()            
+              
+        #--------from frecells to foundations------------
         
-        
-        if(index1 < 4):
-            currCard=temp_node.gi.free_cells[index1]
-            print("card is: " +temp_node.gi.printCard(currCard))
-           
+        for i in range(4):
+            temp_node=copy.deepcopy(parent)  
+            currCard=temp_node.gi.free_cells[i]
+            print("card is: " +temp_node.gi.printCard(currCard)+" from freecell "+str((i+1)))
+            
             if not(currCard.suit=='' or currCard.suit==None):
                 f2foundationsMove = temp_node.gi.freecell2foundation() #attempt to add current card from freecells to Foundations
                 if(f2foundationsMove):
@@ -440,17 +442,14 @@ def find_children(sub_root,method):
                     while(temparent!=None and not foundrejected1):
                         if(not temp_node.equalInstances(temparent)):
                             temparent=temparent.parent
-                            #continue
                         else:
                             print("loop detected")
                             foundrejected1=True
-                            
+                     
                     if(not foundrejected1):
-                        
                         new_node=add2tree(parent,temp_node.gi)
                         kidsthiscycle.append(new_node)
                         new_node.h=parent.gi.manhattan_distance(parent.gi.free_cells[index1],-1)
-                        new_node.gi.printGame()
                         if(method=='best'):
                             new_node.f=new_node.h
                         elif(method=='astar'):
@@ -466,22 +465,23 @@ def find_children(sub_root,method):
                             add_frontier_in_order(new_node)
                         print("dfs foundations")
                         new_node.gi.printGame()
-                         
-                        #return True
-            
+                
             
         temp_node=copy.deepcopy(parent)
-        if(not temp_node.gi.tableau[index0] or ((int(temp_node.gi.tableau[index0][-1].number) == int(temp_node.gi.tableau[index0][-2].number) -1) and ((temp_node.gi.tableau[index0][-1].suit in diamonds_and_hearts and temp_node.gi.tableau[index0][-2].suit in spades_and_clubs) or (temp_node.gi.tableau[index0][-1].suit in spades_and_clubs and temp_node.gi.tableau[index0][-2].suit in diamonds_and_hearts)))): #in case of empty stack go to the next one
+        
+        while not temp_node.gi.tableau[index0]: #in case of empty stack go to the next one
             _index0+=1
             index0 = _index0 % NUM_OF_STACKS
+            
         currCard=temp_node.gi.tableau[index0][-1]
         print("card is: " +temp_node.gi.printCard(currCard))
         
+        #-----------from tableau to foundations------------------
         t2foundationsMove = temp_node.gi.add2Foundations(temp_node.gi.tableau[index0][-1]) #attempt to add current card to Foundations
         if(t2foundationsMove):
             temp_node.gi.tableau[index0].pop() #get rid of clone card
             temparent=parent
-            while(temparent!=None and not foundrejected0):
+            while (temparent!=None) and (not temparent.is_root) and (not foundrejected0):
                 if(not temp_node.equalInstances(temparent)):
                     temparent=temparent.parent
                     #continue
@@ -508,59 +508,61 @@ def find_children(sub_root,method):
                     add_frontier_in_order(new_node)
                 print("dfs foundations")
                 #return True
-        if(index1<4):   
-            if(int(parent.gi.free_cells[index1].number) != -1): #if there is a card in freecells
-                
-                temp_node=copy.deepcopy(parent) #clean temp_node from previous changes
-                currCard=temp_node.gi.free_cells[index1]
-                print("card is: " +temp_node.gi.printCard(currCard))
-                freecells2tableauMove = temp_node.gi.freecells2tableau(index0)
-                
-                if(freecells2tableauMove):
-                    temparent=parent
-                    while(temparent!=None and not f2trejected):
-                        if(not temp_node.equalInstances(temparent)):
-                            temparent=temparent.parent
-                            #continue
-                        else:
-                            print("loop detected")
-                            f2trejected=True
-                            
-                    if(not f2trejected):
-                        new_node=add2tree(parent,temp_node.gi)
-                        kidsthiscycle.append(new_node)
-                        new_node.h=new_node.h=parent.gi.manhattan_distance(parent.gi.free_cells[index1],-1)
-                        if(method=='best'):
-                            new_node.f=new_node.h
-                        elif(method=='astar'):
-                            new_node.f= new_node.g + new_node.h
-                        else:
-                            new_node.f=0
+  
+    
+        #------------from frecells to tableau--------------------
+        if(int(parent.gi.free_cells[index1].number) != -1): #if there is a card in freecells
+            
+            temp_node=copy.deepcopy(parent) #clean temp_node from previous changes
+            currCard=temp_node.gi.free_cells[index1]
+            print("card is: " +temp_node.gi.printCard(currCard))
+            freecells2tableauMove = temp_node.gi.freecells2tableau(index0)
+            
+            if(freecells2tableauMove):
+                temparent=parent
+                while(temparent!=None and not f2trejected):
+                    if(not temp_node.equalInstances(temparent)):
+                        temparent=temparent.parent
+                        #continue
+                    else:
+                        print("loop detected")
+                        f2trejected=True
                         
-                        if(method=='depth'):
-                            add_frontier_front(new_node)  #returns bool
-                        elif(method=='breadth'):
-                            add_frontier_back(new_node)
-                        elif(method=='best' or method=='astar'):
-                            add_frontier_in_order(new_node)
-                        print("fromfreecells")
-                        #return True
+                if(not f2trejected):
+                    new_node=add2tree(parent,temp_node.gi)
+                    kidsthiscycle.append(new_node)
+                    new_node.h=new_node.h=parent.gi.manhattan_distance(parent.gi.free_cells[index1],-1)
+                    if(method=='best'):
+                        new_node.f=new_node.h
+                    elif(method=='astar'):
+                        new_node.f= new_node.g + new_node.h
+                    else:
+                        new_node.f=0
+                    
+                    if(method=='depth'):
+                        add_frontier_front(new_node)  #returns bool
+                    elif(method=='breadth'):
+                        add_frontier_back(new_node)
+                    elif(method=='best' or method=='astar'):
+                        add_frontier_in_order(new_node)
+                    print("fromfreecells")
+                    #return True
                     
                 
         
         temp_node=copy.deepcopy(parent)
         currCard=temp_node.gi.tableau[index0][-1]
         print("card is: " +temp_node.gi.printCard(currCard))
-        StackingMove = temp_node.gi.stackCard(temp_node.gi.tableau[index0])
         
+        #-----------from one stack to another stack--------------
+        StackingMove = temp_node.gi.stackCard(temp_node.gi.tableau[index0])
         if(StackingMove):
-            temp_node.gi.tableau[index0].pop()
+            temp_node.gi.tableau[index0].pop() #get rid of clone card
            
             temparent=parent
             while(temparent!=None and not s2srejected):
                 if(not temp_node.equalInstances(temparent)):
                     temparent=temparent.parent
-                    #continue
                 else:
                     print("loop detected")
                     s2srejected=True
@@ -594,6 +596,8 @@ def find_children(sub_root,method):
         if not(currCard in temp_node.gi.free_cells):
         #check if the top 2 cards are already stacked 
             if len(temp_node.gi.tableau[index0])>1 and not ((int(currCard.number) == int(temp_node.gi.tableau[index0][-2].number) -1) and ((currCard.suit in diamonds_and_hearts and temp_node.gi.tableau[index0][-2].suit in spades_and_clubs) or (currCard.suit in spades_and_clubs and temp_node.gi.tableau[index0][-2].suit in diamonds_and_hearts))):
+                
+                #---------------------from tableau to freecell-----------------------------------
                 freecellsMove = temp_node.gi.copy2freecells(temp_node.gi.tableau[index0][-1])
                 if(freecellsMove):
                     temp_node.gi.tableau[index0].pop() #get rid of clone card
@@ -627,14 +631,12 @@ def find_children(sub_root,method):
                         print("2freecells")
                         #return True
                 
-        loops+=1
-        _index0+=1 
+        loops+=1  
+        _index0+=1  #check next tableau stack
         _index1+=1 #check next freecell
+        parent.gi.printGame()
         if kidsthiscycle:
             return True
-        elif(index0==8):
-            return False
-            
     return False
 
 def search(method):
@@ -644,7 +646,7 @@ def search(method):
         if(nowtime > startTime +datetime.timedelta(minutes=5)):
             print("--Timeout-- \n")
             return None
-        current_node=frontier.pop(0)
+        current_node=frontier.popleft()
         if(isSolution(current_node)):
             return current_node
         found=find_children(current_node, method)
